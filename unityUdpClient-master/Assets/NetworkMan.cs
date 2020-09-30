@@ -16,6 +16,7 @@ public class NetworkMan : MonoBehaviour
 {
     public GameObject cube;
     public List<GameObject> cubeList;
+    public List<string> droppedPlayers;
 
     public UdpClient udp;
     // Start is called before the first frame update
@@ -28,9 +29,9 @@ public class NetworkMan : MonoBehaviour
 
         udp = new UdpClient();
 
-        //udp.Connect("3.91.228.18", 12345);
+        udp.Connect("3.91.228.18", 12345);
 
-        udp.Connect("localhost", 12345);
+        //udp.Connect("localhost", 12345);
 
         Byte[] sendBytes = Encoding.ASCII.GetBytes("connect");
 
@@ -50,6 +51,7 @@ public class NetworkMan : MonoBehaviour
         NEW_CLIENT,
         UPDATE,
         EXIT,
+        LIST,
         NONE
     };
 
@@ -100,21 +102,36 @@ public class NetworkMan : MonoBehaviour
         public Player player;
     }
 
+    //public class DropGameState
+    //{
+    //    public Message message;
+    //    public NewPlayer player;
+    //}
+
     public class DropGameState
     {
         public Message message;
-        public NewPlayer player;
+        public List<NewPlayer> player;
+    }
+
+    [Serializable]
+    public class ListOfDroppedPlayers
+    {
+        public string[] droppedPlayers;
     }
 
     //public Player[] allPlayers;
     public List<Player> allPlayers;
     GameObject cloneTag;
 
-    public NewGameState newGameState;
-    public DropGameState dropGameState;
-    public SuperDropGameState superDropGameState;
-    private float ex_message = 0;
+    public List<Player> deletedPlayers;
 
+    public NewGameState newGameState;
+    //public DropGameState dropGameState;
+
+    public GameState listGameState;
+    public GameState dropGameState;
+    public SuperDropGameState superDropGameState;
     private float cubePosition = -4.0f;
 
     public Message latestMessage;
@@ -133,7 +150,9 @@ public class NetworkMan : MonoBehaviour
         // do what you'd like with `message` here:
         string returnData = Encoding.ASCII.GetString(message);
 
-        dropGameState = new DropGameState();
+        //dropGameState = new DropGameState();
+
+        dropGameState = new GameState();
         newGameState = new NewGameState();
         lastestGameState = new GameState();
 
@@ -151,17 +170,21 @@ public class NetworkMan : MonoBehaviour
                     //UpdatePlayers();
                     break;
                 case commands.EXIT:
-                    dropGameState = JsonUtility.FromJson<DropGameState>(returnData);
+                    //dropGameState = JsonUtility.FromJson<DropGameState>(returnData);
+                    //ListOfDroppedPlayers latestDroppedPlayer = JsonUtility.FromJson<ListOfDroppedPlayers>(returnData);
+                    //foreach (string player in latestDroppedPlayer.droppedPlayers)
+                    //{
+                    //    droppedPlayers.Add(player);
+                    //}
+                    dropGameState = JsonUtility.FromJson<GameState>(returnData);
+                    foreach (Player player in dropGameState.players)
+                    {
+                        deletedPlayers.Add(player);
+                    }
                     break;
-                    //superDropGameState = JsonUtility.FromJson<SuperDropGameState>(returnData);
-                    //Debug.Log("Error: " + dropGameState.player.id + "And Error: " + dropGameState.message.cmd.ToString());
-                    //Debug.Log("Error 3: " + superDropGameState.player.id + "And Error 3: " + superDropGameState.message.cmd.ToString());
-                    //Debug.Log("ERROR MESSAGE: " + latestMessage.cmd.ToString());
-                    //DestroyPlayers();
-                    //break;
-                //default:
-                //    Debug.Log("ERROR");
-                //    break;
+                case commands.LIST:
+                    listGameState = JsonUtility.FromJson<GameState>(returnData);
+                    break;
             }
         }
         catch (Exception e) {
@@ -191,8 +214,6 @@ public class NetworkMan : MonoBehaviour
                 {
                     if (allPlayers.Contains(newplayer) == false)
                     {
-                        //Player newplayer = new Player();
-                        //Debug.Log("XXX" + newGameState.player.id);
                         newplayer.id = newGameState.player.id;
                         newplayer.color.B = newplayer.color.G = newplayer.color.R = 0;
                         allPlayers.Add(newplayer);
@@ -203,17 +224,28 @@ public class NetworkMan : MonoBehaviour
                         script = cube.GetComponent<CubeScript>();
                         script.cubeid = newplayer.id;
                     }
-                    //newplayer.id = newGameState.player.id;
-                    //newplayer.color.B = newplayer.color.G = newplayer.color.R = 0;
-                    //allPlayers.Add(newplayer);
-                    //cubeList.Add((GameObject)Instantiate(cube, new Vector3(0.0f, cubePosition + cubeList.Count, 6.0f), Quaternion.identity));
-                    //CubeScript script;
-                    //script = cube.GetComponent<CubeScript>();
-                    //script.cubeid = newplayer.id;
-                    //Debug.Log("CHECK ME: " + allPlayers.Count);
                 }
             }
         }
+
+        //if (listGameState.players.Count > 0)
+        //{
+        //    foreach (Player player in listGameState.players)
+        //    {
+        //        if (player.id.Equals(allPlayers[0].id.ToString()))
+        //            continue;
+        //        newplayer.id = player.id;
+        //        newplayer.color.B = newplayer.color.G = newplayer.color.R = 0;
+        //        allPlayers.Add(newplayer);
+        //        cloneTag = (GameObject)Instantiate(cube, new Vector3(0.0f, cubePosition + cubeList.Count, 6.0f), Quaternion.identity);
+        //        cubeList.Add(cloneTag);
+        //        cloneTag.name = newplayer.id.ToString();
+        //        CubeScript script;
+        //        script = cube.GetComponent<CubeScript>();
+        //        script.cubeid = newplayer.id;
+        //    }
+        //}
+
     }
 
     void UpdatePlayers(){
@@ -243,10 +275,6 @@ public class NetworkMan : MonoBehaviour
                             Renderer myRenderer = cubeX.GetComponent<Renderer>();
                             myRenderer.material.color = new Color(colorR, colorG, colorB);
 
-                            //cubeX.GetComponent<Renderer>().material.color = new Color(colorR, colorG, colorB);
-                            //CubeScript script;
-                            //script = cube.GetComponent<CubeScript>();
-                            //script.cubeid = lastestGameState.players[i].id;
                         }
                     }
                 }
@@ -257,42 +285,132 @@ public class NetworkMan : MonoBehaviour
     }
 
     void DestroyPlayers(){
-        //if (latestMessage.cmd == commands.EXIT)
-        if (latestMessage.cmd == commands.EXIT)
+        if (deletedPlayers.Count > 0)
         {
-            bool isTheSame = false;
-            int isTheSameIndex = -1;
-            Debug.Log("I am GETTING DESTROYED 5");
-            if (dropGameState != null)
+            foreach (Player player in deletedPlayers)
             {
-                for (int i = 0; i < allPlayers.Count; i++)
+                //for (int i = 0; i < allPlayers.Count; i++)
+                //{
+                //    if (player.id.Equals(allPlayers[i].id.ToString()))
+                //    {
+                //        allPlayers.RemoveAt(i);
+                //        break;
+                //    }
+                //}
+
+                //Debug.Log("CHECKING: " + player.id.ToString());
+                //Debug.Log("CHECK AGAIN: " + dropGameState.message.cmd);
+                if (dropGameState.message.cmd == commands.NEW_CLIENT)
                 {
-                    if (allPlayers[i].id.Equals(dropGameState.player.id) == true)
+                    for (int i = 0; i < allPlayers.Count; i++)
                     {
-                        isTheSame = true;
-                        isTheSameIndex = i;
+                        if (player.id.Equals(allPlayers[i].id.ToString()))
+                        {
+                            allPlayers.RemoveAt(i);
+                            break;
+                        }
                     }
+                    GameObject delete = GameObject.Find(player.id.ToString());
+                    Destroy(delete);
+                    deletedPlayers.Clear();
                 }
-            }
-            if (isTheSame == true)
-            {
-                Debug.Log("I am GETTING DESTROYED" + isTheSame + dropGameState.player.id.ToString());
-                CubeScript script1;
-                script1 = cube.GetComponent<CubeScript>();
-                //Debug.Log("I am GETTING DESTROYED THERE" + script1.cubeid);
-                if (dropGameState.player.id.Equals(script1.cubeid) == true)
-                {
-                    //script1.SelfDestruct();
-                    //(GameObject.FindWithTag("cube"));
-                    if (isTheSameIndex >= 0)
-                        allPlayers.RemoveAt(isTheSameIndex);
-                }
-                GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
-                Destroy(delete);
             }
         }
+
+
+        //if (deletedPlayers.Count > 0)
+        //{
+        //    //Debug.Log("CHECK" + deletedPlayers.Count);
+        //    for (int i = 0; i < deletedPlayers.Count; i++)
+        //    {
+        //        for (int j = 0; j < allPlayers.Count; j++)
+        //        {
+        //            if (deletedPlayers[i].id.Equals(allPlayers[j].id.ToString()))
+        //            {
+        //                Debug.Log("CHECK" + deletedPlayers[i].id.ToString());
+        //                GameObject delete = GameObject.Find(allPlayers[j].id.ToString());
+        //                Destroy(delete);
+        //            }
+        //            allPlayers.RemoveAt(j);
+        //        }
+        //    }
+        //    deletedPlayers.Clear();
+        //}
+
+
+        //if (droppedPlayers.Count > 0)
+        //{
+        //    foreach (string playerID in droppedPlayers)
+        //    {
+        //        GameObject delete = GameObject.Find(playerID);
+        //    }
+        //    droppedPlayers.Clear();
+        //}
+
+        //bool isTheSame = false;
+        //int isTheSameIndex = -1;
+        //Debug.Log("I am GETTING DESTROYED 5");
+        //if (dropGameState != null)
+        //{
+        //    for (int i = 0; i < allPlayers.Count; i++)
+        //    {
+        //        //for (int j = 0; j < dropGameState.player.Count; j++)
+        //        //{
+        //        if (allPlayers[i].id.Equals(dropGameState.player.id.ToString()) == true)
+        //        {
+        //            //Debug.Log("CHEHCKCK: " + dropGameState.player[j].id.ToString());
+        //                //isTheSame = true;
+        //                //isTheSameIndex = i;
+        //                GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
+        //                if (isTheSameIndex >= 0)
+        //                {
+        //                    allPlayers.RemoveAt(isTheSameIndex);
+        //                    Destroy(delete);
+        //                }
+        //        }
+        //        //}
+        //    }
+        //}
+        //if (isTheSame == true)
+        //{
+        //    //Debug.Log("I am GETTING DESTROYED" + isTheSame + dropGameState.player.id.ToString());
+        //    CubeScript script1;
+        //    script1 = cube.GetComponent<CubeScript>();
+        //    for (int i = 0; i < allPlayers.Count; i++)
+        //    {
+        //        if (allPlayers[i].id.Equals(dropGameState.player.id) == true)
+        //        {
+        //            GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
+        //            if (isTheSameIndex >= 0)
+        //            {
+        //                allPlayers.RemoveAt(isTheSameIndex);
+        //                Destroy(delete);
+        //            }
+        //        }
+        //    }
+
+
+
+
+        //    //if (dropGameState.player.id.Equals(script1.cubeid) == true)
+        //    //{
+        //    //    GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
+        //    //    if (isTheSameIndex >= 0)
+        //    //    {
+        //    //        allPlayers.RemoveAt(isTheSameIndex);
+        //    //        Destroy(delete);
+        //    //    }
+        //    //    //    allPlayers.RemoveAt(isTheSameIndex);
+        //    //    //GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
+        //    //    //Destroy(delete);
+        //    //}
+        //    //GameObject delete = GameObject.Find(dropGameState.player.id.ToString());
+        //    //Destroy(delete);
+        //    Debug.Log("CHECK: " + allPlayers.Count);
+        //}
+
     }
-    
+
     void HeartBeat(){
         Byte[] sendBytes = Encoding.ASCII.GetBytes("heartbeat");
         udp.Send(sendBytes, sendBytes.Length);
